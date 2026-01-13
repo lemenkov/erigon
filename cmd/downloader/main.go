@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	g "github.com/anacrolix/generics"
@@ -107,6 +108,7 @@ var (
 	dbWritemap           bool
 	all                  bool
 	diffMode             bool
+	torrentCreationDate  int64
 )
 
 var cobraFlagValues struct {
@@ -149,6 +151,7 @@ func init() {
 	withChainFlag(createTorrent)
 	rootCmd.AddCommand(createTorrent)
 	createTorrent.Flags().BoolVar(&all, "all", true, "Produce all possible .torrent files")
+	withTorrentCreationDate(createTorrent)
 
 	rootCmd.AddCommand(torrentCat)
 	rootCmd.AddCommand(torrentMagnet)
@@ -175,6 +178,7 @@ func init() {
 		panic(err)
 	}
 	printTorrentHashes.Flags().BoolVar(&diffMode, "diff", false, "show diff against the currently released .toml from erigon-snapshot (GitHub)")
+	withTorrentCreationDate(printTorrentHashes)
 	rootCmd.AddCommand(printTorrentHashes)
 
 	withChainFlag(&verifyWebseedsCmd)
@@ -198,6 +202,14 @@ func withFile(cmd *cobra.Command) {
 	if err := cmd.MarkFlagFilename("file"); err != nil {
 		panic(err)
 	}
+}
+
+func withTorrentCreationDate(cmd *cobra.Command) {
+	cmd.Flags().Int64Var(&torrentCreationDate, "torrent.creation-date", 0,
+		"Unix timestamp stamped into generated .torrent files for reproducible output. "+
+			"Omit the flag to use the current time; pass it without a value for Erigon's genesis "+
+			"timestamp; or --torrent.creation-date=<unix> for your own.")
+	cmd.Flags().Lookup("torrent.creation-date").NoOptDefVal = strconv.FormatInt(downloader.ErigonGenesisTimestamp, 10)
 }
 
 var logger log.Logger
@@ -388,7 +400,7 @@ var createTorrent = &cobra.Command{
 		if err := checkChainName(cmd.Context(), dirs, chain); err != nil {
 			return err
 		}
-		createdAmount, err := downloader.BuildTorrentFilesIfNeed(cmd.Context(), dirs, downloader.NewAtomicTorrentFS(dirs.Snap), chain, nil, all)
+		createdAmount, err := downloader.BuildTorrentFilesIfNeed(cmd.Context(), dirs, downloader.NewAtomicTorrentFSWithCreationDate(dirs.Snap, torrentCreationDate), chain, nil, all)
 		if err != nil {
 			return err
 		}
@@ -637,7 +649,7 @@ func doPrintTorrentHashes(ctx context.Context, logger log.Logger) error {
 		return err
 	}
 
-	tf := downloader.NewAtomicTorrentFS(dirs.Snap)
+	tf := downloader.NewAtomicTorrentFSWithCreationDate(dirs.Snap, torrentCreationDate)
 
 	if forceRebuild { // remove and create .torrent files (will re-read all snapshots)
 		//removePieceCompletionStorage(snapDir)

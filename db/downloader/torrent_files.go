@@ -36,10 +36,17 @@ import (
 type AtomicTorrentFS struct {
 	lock sync.Mutex
 	dir  string
+	// creationDate is stamped into generated .torrent files. A value <= 0 makes
+	// generation use the current wall-clock time (non-reproducible).
+	creationDate int64
 }
 
 func NewAtomicTorrentFS(dir string) *AtomicTorrentFS {
-	return &AtomicTorrentFS{dir: dir}
+	return NewAtomicTorrentFSWithCreationDate(dir, 0)
+}
+
+func NewAtomicTorrentFSWithCreationDate(dir string, creationDate int64) *AtomicTorrentFS {
+	return &AtomicTorrentFS{dir: dir, creationDate: creationDate}
 }
 
 func (tf *AtomicTorrentFS) Exists(name string) (bool, error) {
@@ -128,7 +135,7 @@ func (tf *AtomicTorrentFS) CreateWithMetaInfo(info *metainfo.Info, additionalMet
 	if !strings.HasSuffix(name, ".torrent") {
 		name += ".torrent"
 	}
-	mi, err := CreateMetaInfo(info, additionalMetaInfo)
+	mi, err := CreateMetaInfo(info, additionalMetaInfo, tf.creationDate)
 	if err != nil {
 		return false, err
 	}

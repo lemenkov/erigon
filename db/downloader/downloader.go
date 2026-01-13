@@ -361,7 +361,7 @@ func New(ctx context.Context, cfg *downloadercfg.Cfg, logger log.Logger) (*Downl
 		torrentClient:      torrentClient,
 		addWebSeedOpts:     addWebSeedOpts,
 		logger:             logger,
-		torrentFS:          &AtomicTorrentFS{dir: cfg.Dirs.Snap},
+		torrentFS:          NewAtomicTorrentFS(cfg.Dirs.Snap),
 	}
 
 	d.zeroActiveDownloadRequests.L = &d.activeDownloadRequestsLock

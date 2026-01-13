@@ -239,20 +239,34 @@ Loop:
 	return int(createdAmount.Load()), nil
 }
 
-func CreateMetaInfo(info *metainfo.Info, mi *metainfo.MetaInfo) (*metainfo.MetaInfo, error) {
+const (
+	// ErigonGenesisTimestamp is the Unix timestamp of Erigon's first commit
+	// (Thu Dec 26 12:45:52 2013 +0100). Opt-in creation date for reproducible
+	// torrent generation.
+	ErigonGenesisTimestamp int64 = 1388058352
+)
+
+// CreateMetaInfo builds (or amends) a torrent's metainfo. creationDate is the Unix
+// timestamp stamped into the CreationDate field; a value <= 0 falls back to the
+// current wall-clock time, yielding non-reproducible output.
+func CreateMetaInfo(info *metainfo.Info, mi *metainfo.MetaInfo, creationDate int64) (*metainfo.MetaInfo, error) {
+	if creationDate <= 0 {
+		creationDate = time.Now().Unix()
+	}
 	if mi == nil {
 		infoBytes, err := bencode.Marshal(info)
 		if err != nil {
 			return nil, err
 		}
 		mi = &metainfo.MetaInfo{
-			CreationDate: time.Now().Unix(),
+			CreationDate: creationDate,
 			// TODO: Differentiate direct web source vs generated locally.
 			CreatedBy:    "erigon",
 			InfoBytes:    infoBytes,
 			AnnounceList: Trackers,
 		}
 	} else {
+		mi.CreationDate = creationDate
 		mi.AnnounceList = Trackers
 	}
 	return mi, nil
